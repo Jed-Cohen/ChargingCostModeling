@@ -50,7 +50,7 @@ if __name__ == '__main__':
     land = pd.read_csv('Data/LandPrices.csv')
     electric = pd.read_csv('Data/ElectricityData.csv')
     econ = pd.read_csv('Data/EconData.csv')
-    stations = pd.read_csv('Data/StationData - Copy.csv', low_memory=False)
+    stations = pd.read_csv('Data/Station_Data.csv', low_memory=False)
     zipcodes = pd.read_csv('Data/Zipcodes.csv')
     sales_tax = pd.read_csv('Data/Sales Tax Data.csv').to_numpy()
     population = pd.read_csv('Data/Population.csv').to_numpy()
