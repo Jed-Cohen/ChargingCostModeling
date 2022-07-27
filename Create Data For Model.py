@@ -1,13 +1,9 @@
 import numpy as np
 import pandas as pd
 
-
-def correlation(column1, column2, data):
-    return data[column1].corr(data[column2])
-
-
-def zip_interpolate(col, cur_zip, zip_map):
-    upper = cur_zip
+# This program does essentially the same thing as Data_Prep.py but for California only
+def zip_interpolate(col, zipcode, zip_map):
+    upper = zipcode
     lower = upper
     upper_factor = 1
     lower_factor = 1
@@ -22,48 +18,6 @@ def zip_interpolate(col, cur_zip, zip_map):
             lower_factor = 0
             lower = 98107
     return (zip_map[upper][col] * upper_factor + zip_map[lower][col] * lower_factor) / (upper_factor + lower_factor)
-
-
-def standardize(data):
-    return (data - data.mean()) / data.std()
-
-
-def normalize(data):
-    return (data - data.min()) / (data.max() - data.min())
-
-
-def is_valid_zip(zipcode):
-    try:
-        zipcode += 1
-        zipcode -= 1
-    except:
-        return False
-    if zipcode > 600:
-        return True
-    return False
-
-
-def num_evs():
-    registration_dict = {'CO': pd.read_csv('Data/Registration Data/co_ev_registrations_public.csv'),
-                         'CT': pd.read_csv('Data/Registration Data/ct_ev_registrations_public.csv'),
-                         'MI': pd.read_csv('Data/Registration Data/mi_ev_registrations_public.csv'),
-                         'MN': pd.read_csv('Data/Registration Data/mn_ev_registrations_public.csv', low_memory=False),
-                         'NJ': pd.read_csv('Data/Registration Data/nj_ev_registrations_public.csv', low_memory=False),
-                         'NY': pd.read_csv('Data/Registration Data/ny_ev_registrations_public.csv'),
-                         'OR': pd.read_csv('Data/Registration Data/or_ev_registrations_public.csv', low_memory=False),
-                         'TX': pd.read_csv('Data/Registration Data/tx_ev_registrations_public.csv'),
-                         'VT': pd.read_csv('Data/Registration Data/vt_ev_registrations_public.csv'),
-                         'WA': pd.read_csv('Data/Registration Data/wa_ev_registrations_public.csv', low_memory=False),
-                         'WI': pd.read_csv('Data/Registration Data/wi_ev_registrations_public.csv')}
-    ev_sums = {}
-    for key in registration_dict:
-        state = registration_dict[key]
-        for index in state.index:
-            if is_valid_zip(state['ZIP Code'][index]):
-                if state['ZIP Code'][index] not in ev_sums:
-                    ev_sums[state['ZIP Code'][index]] = 0
-                ev_sums[state['ZIP Code'][index]] += 1
-    return ev_sums
 
 
 if __name__ == '__main__':
@@ -112,13 +66,11 @@ if __name__ == '__main__':
     electric_data = electric.to_numpy()
     num_stats = 7
     d = {}
-    columns = {'L2_$/hr': stations['L2 $/hr'], 'L2_flat': stations['L2 flat'],
-               'L2_$/kWh': stations['L2 $/kWh'], 'DCFC_$/hr': stations['DCFC $/Hr'],
+    columns = {'DCFC_$/hr': stations['DCFC $/Hr'],
                'DCFC_flat': stations['DCFC flat'], 'DCFC_$/kWh': stations['DCFC $/kWh'], 'State': stations['State']}
     station_data = pd.DataFrame(columns)
     station_data['is_na'] = station_data[station_data.columns].isnull().apply(lambda x: all(x), axis=1)
     station_data['ZIP'] = stations['ZIP']
-    station_data['L2_count'] = stations['EV Level2 EVSE Num']
     station_data['DCFC_count'] = stations['EV DC Fast Count']
     station_data['State'] = stations['State']
     L2_stations = np.zeros((len(station_data['ZIP']), 4))
@@ -132,15 +84,6 @@ if __name__ == '__main__':
     for ind in station_data.index:
         if int(station_data['ZIP'][ind]) in d:
             if not station_data['is_na'][ind] and station_data['State'][ind] == 'CA':
-                if not pd.isnull(station_data['L2_count'][ind]):
-                    L2_stations[L2_counter][0] = station_data['ZIP'][ind]
-                    if not pd.isnull(station_data['L2_$/hr'][ind]):
-                        L2_stations[L2_counter][1] = station_data['L2_$/hr'][ind]
-                    if not pd.isnull(station_data['L2_flat'][ind]):
-                        L2_stations[L2_counter][2] = station_data['L2_flat'][ind]
-                    if not pd.isnull(station_data['L2_$/kWh'][ind]):
-                        L2_stations[L2_counter][3] = station_data['L2_$/kWh'][ind]
-                    L2_counter += 1
                 if not pd.isnull(station_data['DCFC_count'][ind]):
                     DCFC_stations[DCFC_counter][0] = station_data['ZIP'][ind]
                     if not pd.isnull(station_data['DCFC_$/hr'][ind]):
@@ -207,17 +150,9 @@ if __name__ == '__main__':
             final_data[i][6] = zip_count_dict[cur_zip][0] / zip_count_dict[cur_zip][1]
     edited_data = pd.DataFrame(final_data, columns=['ZIP', 'Electric Price', 'Land Value',
                                                     'Economic Activity', 'Station Count', 'Sales Tax', 'EV density'])
-    edited_data.to_csv('Data/CA_model_data.csv')
-    L2_data = np.zeros((len(L2_stations), num_stats + 1))
+    edited_data.to_csv('Data/CA_model_input.csv')
     for row in final_data:
         d[row[0]] = row
-    for i in range(len(L2_data)):
-        if L2_stations[i][0] != 0:
-            ref = d[int(L2_stations[i][0])]
-            L2_data[i][0] = L2_stations[i][2] + L2_stations[i][1] * 3 + L2_stations[i][3] * 20
-            for j in range(num_stats - 1):
-                L2_data[i][j + 1] = ref[j + 1]
-            L2_data[i][num_stats] = int(L2_stations[i][0])
     DCFC_data = np.zeros((len(DCFC_stations), num_stats + 1))
     for i in range(len(DCFC_data)):
         if DCFC_stations[i][0] != 0:
@@ -228,26 +163,16 @@ if __name__ == '__main__':
             DCFC_data[i][num_stats] = int(DCFC_stations[i][0])
     counter = 0
     for row in DCFC_data:
-        if 0 not in (row[0], row[1], row[2], row[3], row[4]):#, row[6]):
+        if 0 not in (row[0], row[1], row[2], row[3], row[4]):
             counter += 1
     DCFC_clean = np.zeros((counter, num_stats + 1))
     counter = 0
     for row in DCFC_data:
-        if 0 not in (row[0], row[1], row[2], row[3], row[4]):#, row[6]):
+        if 0 not in (row[0], row[1], row[2], row[3], row[4]):
             DCFC_clean[counter] = row
             counter += 1
     counter = 0
-    for row in L2_data:
-        if 0 not in (row[0], row[1], row[2], row[3], row[4]):#, row[6]):
-            counter += 1
-    L2_clean = np.zeros((counter, num_stats + 1))
-    counter = 0
-    for row in L2_data:
-        if 0 not in (row[0], row[1], row[2], row[3], row[4]):#, row[6]):
-            L2_clean[counter] = row
-            counter += 1
     columns = ['Converted Cost', 'Electric Price', 'Land Value',
                'Economic Activity', 'Station Count', 'Sales Tax', 'EV density', 'ZIP']
     DCFC_df = pd.DataFrame(DCFC_clean, columns=columns)
-    DCFC_df.to_csv('Data/CA DCFC.csv')
-
+    DCFC_df.to_csv('Data/CA_stations.csv')
