@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-# This program does essentially the same thing as Data_Prep.py but for California only
+
+# This program does essentially the same thing as Data_Prep.py but for California only, I only explain the changes
 def zip_interpolate(col, zipcode, zip_map):
     upper = zipcode
     lower = upper
@@ -24,22 +25,23 @@ if __name__ == '__main__':
     zip_county = pd.read_csv('Data/CA zip county.csv')
     registration = pd.read_csv('Data/ca_ev_registrations_public.csv', low_memory=False)
     Codes = pd.read_csv('Data/County Codes.csv')
-    code_dict = {}
-    population_dict = {}
+    code_dict = {}  # Dictionary with county as key and county GEOID as value
+    population_dict = {}  # Dictionary with county as key and population as value
     for row in Codes.index:
         code_dict[Codes['County'][row]] = Codes['Code'][row]
         population_dict[Codes['County'][row]] = Codes['Population'][row]
-    county_count = {}
+    county_count = {}  # Dictionary with county as key and number of registrations as value
     for row in registration.index:
         if registration['County GEOID'][row] != 'Unknown':
             if int(registration['County GEOID'][row]) in county_count:
+                # this is the ratio of number of EVs on the road / number of registrations, to scale the data
                 county_count[int(registration['County GEOID'][row])] += (623891 / 2542443)
             else:
                 county_count[int(registration['County GEOID'][row])] = (623891 / 2542443)
-    county_zip_dict = {}
+    county_zip_dict = {}  # Dictionary that takes zip code as key and returns county
     for row in zip_county.index:
         county_zip_dict[int(zip_county['Zip Code'][row])] = zip_county['County'][row]
-    zip_count_dict = {}
+    zip_count_dict = {}  # Dictionary that takes zip code and returns scaled number of registrations
     for key in county_zip_dict.keys():
         if key in county_zip_dict:
             if county_zip_dict[key] in code_dict:
@@ -108,6 +110,7 @@ if __name__ == '__main__':
     econ_dict = {}
     for row in econ_data:
         econ_dict[(row[0], row[1])] = row[15]
+    # Population is included
     for row in population:
         if int(row[0]) in d:
             d[row[0]][8] = row[1]
@@ -146,6 +149,7 @@ if __name__ == '__main__':
             final_data[i][3] = zip_interpolate(5, cur_zip, d)
         final_data[i][5] = d[cur_zip][7]
         final_data[i][4] = d[cur_zip][6]
+        #  EV density added into the data
         if int(cur_zip) in zip_count_dict:
             final_data[i][6] = zip_count_dict[cur_zip][0] / zip_count_dict[cur_zip][1]
     edited_data = pd.DataFrame(final_data, columns=['ZIP', 'Electric Price', 'Land Value',

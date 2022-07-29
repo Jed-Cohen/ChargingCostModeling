@@ -43,12 +43,13 @@ if __name__ == '__main__':
     columns = {'DCFC_$/hr': stations['DCFC $/Hr'],
                'DCFC_flat': stations['DCFC flat'], 'DCFC_$/kWh': stations['DCFC $/kWh'], 'State': stations['State']}
     station_data = pd.DataFrame(columns)
+    # Mark stations that have pricing data
     station_data['is_na'] = station_data[station_data.columns].isnull().apply(lambda x: all(x), axis=1)
     station_data['ZIP'] = stations['ZIP']
     station_data['DCFC_count'] = stations['EV DC Fast Count']
     d = {}  # A dictionary that takes zip codes as keys and returns an array of metrics
     for row in ar:
-        d[row[0]] = np.zeros(num_stats + 3)
+        d[row[0]] = np.zeros(num_stats + 2)
         d[row[0]][0], d[row[0]][1] = row[1], row[2]
     DCFC_counter = 0
     DCFC_stations = np.zeros((len(station_data['ZIP']), 4))  # An array of stations with their zips and prices
@@ -64,29 +65,30 @@ if __name__ == '__main__':
                     if not pd.isnull(station_data['DCFC_$/kWh'][ind]):
                         DCFC_stations[DCFC_counter][3] = station_data['DCFC_$/kWh'][ind]
                     DCFC_counter += 1
+            # used for station count later
             d[int(station_data['ZIP'][ind])][6] += 1
     # adding other metric to the dictionary
+    # adding land value
     for row in land_array:
         if row[0] not in d:
             d[row[0]] = np.zeros(num_stats + 3)
         d[row[0]][2] = row[2]
+    # adding sum of all electricity rates and total number of rates to calculate average
     for row in electric_data:
         if row[0] not in d:
             d[row[0]] = np.zeros(num_stats + 3)
         d[row[0]][3] += row[2]
         d[row[0]][4] += 1
-    econ_dict = {}
+    econ_dict = {}  # a dictionary that takes lat/lon pair to economic activity
     for row in econ_data:
         econ_dict[(row[0], row[1])] = row[15]
-    for row in population:
-        if int(row[0]) in d:
-            d[row[0]][8] = row[1]
-    for row in sales_tax:
-        if int(row[1]) in d:
-            d[row[1]][7] = row[3]
+    # Add economic activity to dictionary based on closest lat/lon
     for row in ar:
         if (round(row[1]), round(row[2])) in econ_dict:
             d[row[0]][5] = econ_dict[(round(row[1]), round(row[2]))]
+    for row in sales_tax:
+        if int(row[1]) in d:
+            d[row[1]][7] = row[3]
     final_data = np.zeros((len(ar), num_stats))   # an array for zip codes with their metrics
     for i in range(len(ar)):
         cur_zip = ar[i][0]
@@ -113,12 +115,15 @@ if __name__ == '__main__':
     DCFC_data = np.zeros((len(DCFC_stations), num_stats + 1))  # Array for stations and prices and metrics for model
     for i in range(len(DCFC_data)):
         if DCFC_stations[i][0] != 0:
-            DCFC_data[i][0] = DCFC_stations[i][2] + DCFC_stations[i][1] * .5 + DCFC_stations[i][3] * 20
+            # Price standardization (can be tweaked)
+            DCFC_data[i][0] = DCFC_stations[i][2] + DCFC_stations[i][1] * .5 + DCFC_stations[i][3] * 30
             ref = d[int(DCFC_stations[i][0])]
+            # translate over the statistics
             for j in range(num_stats - 1):
                 DCFC_data[i][j + 1] = ref[j + 1]
             DCFC_data[i][num_stats] = int(DCFC_stations[i][0])
     counter = 0
+    # remove any rows without complete data
     for row in DCFC_data:
         if 0 not in (row[0], row[1], row[2], row[3], row[4]):
             counter += 1

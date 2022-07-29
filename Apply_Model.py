@@ -1,17 +1,20 @@
 import joblib
-import numpy as np
 import pandas as pd
+import numpy as np
 
 
 def apply_model(infile, outfile, location, features):
+    # load up saved model
     model = joblib.load(location)
     zip_data = pd.read_csv(infile)
     zip_arr = zip_data['ZIP']
+    # drop columns not in model
     for column in list(zip_data.columns):
         if column not in features:
             zip_data = zip_data.drop(column, axis=1)
     zip_data = zip_data.to_numpy()
     outputs = model.predict(zip_data)
+    # output a file with zip codes and predicted prices
     results = pd.DataFrame()
     results['ZIP'] = zip_arr
     results['Predicted Cost'] = outputs
